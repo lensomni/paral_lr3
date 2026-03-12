@@ -23,10 +23,10 @@ int main(int argc, char *argv[]) {
 	MPI_Comm_rank(MPI_COMM_WORLD, &worldRank);
 
 	if (worldRank == 0) {
-		cout << "Matrix A:\n";
+		cout << "Mатрица A:\n";
 		A = Matrix::createMatrix(4, 5);
 
-		cout << "Matrix B:\n";
+		cout << "Матрица B:\n";
 		B = Matrix::createMatrix(5, 6);
 		Matrix::transponse(B, 5, 6);
 
@@ -34,19 +34,25 @@ int main(int argc, char *argv[]) {
 	}
 	
 	int time = clock();
-	if (*argv[1] == '1') {
-		task1(worldSize, worldRank, A, B, C);
-	} else if (*argv[1] == '2') {
-		task2(worldSize, worldRank, A, B, C);
-	} else if (worldRank == 0) {
-		cout << "Неверно задан праметр - " << argv[1] << endl;
-		MPI_Abort(MPI_COMM_WORLD, -1);
-		exit(0);
+	switch (*argv[1]) {
+		case '1':
+			task1(worldSize, worldRank, A, B, C);
+			break;
+		case '2':
+			task2(worldSize, worldRank, A, B, C);
+			break;
+		default:
+			if (worldRank == 0) {
+				cout << "Неверно задан параметр - " << argv[1] << endl;
+				MPI_Abort(MPI_COMM_WORLD, -1);
+			}
+			exit(0);
 	}
+
 	int timeRes = (float)(clock() - time) * 1000000 / CLOCKS_PER_SEC;
 
 	if (worldRank == 0) {
-		cout << "Matrix C:\n";
+		cout << "Матрица C:\n";
 		Matrix::printMatrix(C, 4, 6, true);
 		cout << "Время выполнения: " << timeRes << " микросекунд\n";
 	}

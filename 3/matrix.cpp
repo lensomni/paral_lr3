@@ -5,7 +5,6 @@ using namespace std;
 
 class Matrix {
 	public:
-	// Вывод матрицы
 	static void printMatrix(int* matrix, int n, int m, bool invert = false) {
 		if (invert) {
 			for(int i = 0; i < n; i++ ) {
@@ -24,7 +23,6 @@ class Matrix {
 		}
 	}
 
-	// Заполнение
 	static void initialize(int* matrix, int n, int m) {
 		// srand(time(0));
 		for(int i = 0; i < n; i++ ) {
@@ -44,7 +42,6 @@ class Matrix {
 		return matrix;
 	}
 
-	// Транспонирование
 	static void transponse(int* arr, int n, int m) {
 		if(n == m){
 			for(int r = 0; r < n; ++r){
