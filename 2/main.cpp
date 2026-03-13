@@ -12,7 +12,7 @@
 #include <fcntl.h>
 #include <sys/file.h>
 #include <errno.h>
-#include <cstring>   // для memset
+#include <cstring>   
 
 int main() {
     setlocale(LC_ALL, "ru_RU.UTF-8");
@@ -21,7 +21,6 @@ int main() {
     Barrier barrier(MAX_CARS, msg_key);
     int msgid = barrier.getMsgQueueId();
 
-    // Создаём и блокируем файлы для этапов
     std::vector<int> stage_fds(STAGES, -1);
     for (int s = 1; s <= STAGES; ++s) {
         std::string path = "/tmp/stage" + std::to_string(s) + ".lock";
@@ -50,12 +49,11 @@ int main() {
         }
     }
 
-    // Инициализация общих результатов
     CarTotalResult total_results[MAX_CARS];
     for (int i = 0; i < MAX_CARS; ++i) {
         total_results[i].car_id = i + 1;
         total_results[i].total_points = 0;
-        // обнуляем stage_results
+
         for (int s = 0; s < STAGES; ++s) {
             total_results[i].stage_results[s].place = 0;
             total_results[i].stage_results[s].points = 0;
@@ -68,7 +66,6 @@ int main() {
         std::cout << "\033c";
         std::cout << "\n=== ЭТАП " << stage << " ===\n";
 
-        // Разблокируем старт этапа
         int idx = stage - 1;
         if (flock(stage_fds[idx], LOCK_UN) == -1) {
             perror("flock UN in main");
@@ -76,10 +73,10 @@ int main() {
         close(stage_fds[idx]);
         stage_fds[idx] = -1;
 
-        // Сброс для этапа
+
         int positions[MAX_CARS] = {0};
         int finished_count = 0;
-        int next_place = 1;  // места начинаются с 1
+        int next_place = 1;  
 
         while (finished_count < MAX_CARS) {
             Message msg;
@@ -97,7 +94,6 @@ int main() {
             }
             if (errno == ENOMSG) errno = 0;
 
-            // Отрисовка текущего состояния
             std::cout << "\033c";
             std::cout << "\n=== ЭТАП " << stage << " ===\n";
             for (int i = 0; i < MAX_CARS; ++i) {
@@ -113,18 +109,16 @@ int main() {
             usleep(30000); 
         }
 
-        // Барьер: ждём, пока все отметились
         while (!barrier.allCarsArrived(stage)) {
             usleep(1000);
         }
         barrier.releaseNextStage(stage);
 
-        // Начисляем очки по местам
-        int points_table[6] = {0, 25, 18, 15, 12, 10};  // индекс = место
+        int points_table[6] = {0, 25, 18, 15, 12, 10}; 
 
         for (int car = 0; car < MAX_CARS; ++car) {
             int place = stage_places[stage-1][car];
-            if (place == 0) place = MAX_CARS;  // на случай ошибки
+            if (place == 0) place = MAX_CARS;  
 
             int points = points_table[place];
 
@@ -133,7 +127,6 @@ int main() {
             total_results[car].total_points += points;
         }
 
-        // Выводим результаты этапа
         printResults(stage, total_results);
 
         if (stage < STAGES) {
@@ -144,7 +137,6 @@ int main() {
         }
     }
 
-    // Cleanup оставшихся lock-файлов (если есть)
     for (int fd : stage_fds) {
         if (fd != -1) {
             flock(fd, LOCK_UN);
@@ -152,7 +144,6 @@ int main() {
         }
     }
 
-    // Ждём завершения всех машин
     for (int i = 0; i < MAX_CARS; ++i) {
         waitpid(pids[i], nullptr, 0);
     }
