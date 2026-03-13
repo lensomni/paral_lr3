@@ -7,6 +7,9 @@
 #include <limits>
 #include <vector>
 
+// mpic++ main.cpp -o paral3_2
+// mpirun --oversubscribe -np 6 ./mpi_race
+
 #define MAX_CARS 5
 #define STAGES 3
 #define DISTANCE 5000
@@ -118,14 +121,14 @@ int main(int argc, char *argv[]) {
                 MPI_Status status;
                 Message msg;
 
-                // Проверяем, есть ли сообщения от машин
+                // Проверяем есть ли сообщения от машин
                 int flag;
                 MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
                 if (flag) {
-                    if (status.MPI_TAG == 0) { // Сообщение о прогрессе
+                    if (status.MPI_TAG == 0) { // о прогрессе
                         MPI_Recv(&msg, sizeof(Message), MPI_BYTE, status.MPI_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                         positions[msg.car_id] = msg.current_distance;
-                    } else if (status.MPI_TAG == 1) { // Сообщение о завершении этапа
+                    } else if (status.MPI_TAG == 1) { // о завершении этапа
                         MPI_Recv(&msg, sizeof(Message), MPI_BYTE, status.MPI_SOURCE, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                         if (stage_places[msg.car_id] == 0) {
                             stage_places[msg.car_id] = next_place++;
@@ -134,7 +137,6 @@ int main(int argc, char *argv[]) {
                     }
                 }
 
-                // Отрисовка текущего состояния
                 std::cout << "\033c";
                 std::cout << "\n=== ЭТАП " << stage << " ===\n";
                 for (int i = 0; i < MAX_CARS; ++i) {
@@ -144,13 +146,9 @@ int main(int argc, char *argv[]) {
                     std::cout << "\033[" << line     << ";0H\033[K\033[" << pos << "C    ______";
                     std::cout << "\033[" << (line+1) << ";0H\033[K\033[" << pos << "C __/  __  \\__";
                     std::cout << "\033[" << (line+2) << ";0H\033[K\033[" << pos << "C'---O----O----'";
-                    // if (stage_places[i] > 0) {
-                    //     std::cout << " (место: " << stage_places[i] << ")";
-                    // }
                 }
                 fflush(stdout);
 
-                // Проверяем, завершили ли все машины этап
                 if (finished_count == MAX_CARS) {
                     stage_finished = true;
                 }
@@ -160,7 +158,6 @@ int main(int argc, char *argv[]) {
 
             MPI_Barrier(MPI_COMM_WORLD);
 
-            // Начисление очков по местам
             int points_table[6] = {0, 25, 18, 15, 12, 10};
 
             for (int car = 0; car < MAX_CARS; ++car) {
