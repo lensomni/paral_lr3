@@ -116,9 +116,7 @@ int main(int argc, char** argv) {
 
     if (size != MAX_CARS + 1) {
         if (rank == 0)
-            std::cerr << "Запустите с " << (MAX_CARS + 1)
-                      << " процессами:\n  mpirun -np "
-                      << (MAX_CARS + 1) << " ./race\n";
+            std::cerr << "Запустите с " << (MAX_CARS + 1) << " процессами";
         MPI_Finalize();
         return 1;
     }
