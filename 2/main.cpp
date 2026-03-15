@@ -1,25 +1,19 @@
 #include <mpi.h>
 #include <iostream>
+#include <iomanip>
 #include <cstdlib>
 #include <ctime>
 #include <unistd.h>
-#include <iomanip>
 #include <limits>
-#include <vector>
+#include <string>
 
-#define MAX_CARS 5
-#define STAGES 3
-#define DISTANCE 5000
+// mpic++ main.cpp -o paral3_2
+// mpirun --oversubscribe -np 6 ./paral3_2
 
-struct Message {
-    int car_id;
-    int current_distance;
-};
-
-struct StageResult {
-    int car_id;
-    int place;
-};
+#define MAX_CARS    5
+#define STAGES      3
+#define DISTANCE    10000
+#define TRACK_WIDTH 50 
 
 struct CarStageResult {
     int place;
@@ -32,69 +26,62 @@ struct CarTotalResult {
     int total_points;
 };
 
+// Вывод итоговой таблицы (арбитр)
 void printResults(int stage, CarTotalResult total_results[MAX_CARS]) {
-    std::cout << "\033[22;0H";
-
+    std::cout << "\n\n";
     std::cout << "| Машина |";
-    for (int s = 1; s <= stage; ++s) {
-        std::cout << "      Этап " << s << "     |";
-    }
+    for (int s = 1; s <= stage; ++s)
+        std::cout << "     Этап " << s << "      |";
     std::cout << "      Итог       |\n";
 
     std::cout << "+--------+";
-    for (int s = 1; s <= stage; ++s) {
+    for (int s = 1; s <= stage; ++s)
         std::cout << "-----------------+";
-    }
     std::cout << "-----------------+\n";
 
-    CarTotalResult sorted_results[MAX_CARS];
-    for (int i = 0; i < MAX_CARS; ++i) {
-        sorted_results[i] = total_results[i];
-    }
-    for (int i = 0; i < MAX_CARS - 1; ++i) {
-        for (int j = 0; j < MAX_CARS - i - 1; ++j) {
-            if (sorted_results[j].total_points < sorted_results[j + 1].total_points) {
-                std::swap(sorted_results[j], sorted_results[j + 1]);
-            }
-        }
-    }
+    CarTotalResult sorted[MAX_CARS];
+    for (int i = 0; i < MAX_CARS; ++i) sorted[i] = total_results[i];
+    for (int i = 0; i < MAX_CARS - 1; ++i)
+        for (int j = 0; j < MAX_CARS - i - 1; ++j)
+            if (sorted[j].total_points < sorted[j + 1].total_points)
+                std::swap(sorted[j], sorted[j + 1]);
 
     int final_places[MAX_CARS];
-    for (int i = 0; i < MAX_CARS; ++i) {
-        for (int j = 0; j < MAX_CARS; ++j) {
-            if (total_results[i].car_id == sorted_results[j].car_id) {
+    for (int i = 0; i < MAX_CARS; ++i)
+        for (int j = 0; j < MAX_CARS; ++j)
+            if (total_results[i].car_id == sorted[j].car_id)
                 final_places[i] = j + 1;
-                break;
-            }
-        }
-    }
 
     for (int i = 0; i < MAX_CARS; ++i) {
-        std::cout << "|   " << std::setw(2) << total_results[i].car_id << "   |";
+        std::cout << "|  " << std::setw(2) << total_results[i].car_id << "    |";
         for (int s = 0; s < stage; ++s) {
-            std::cout << " " << std::setw(2) << total_results[i].stage_results[s].place << " место"
-                      << " | " << std::setw(2) << total_results[i].stage_results[s].points << " б |";
+            std::cout << " " << std::setw(2) << total_results[i].stage_results[s].place
+                      << " место | " << std::setw(2) << total_results[i].stage_results[s].points
+                      << " б |";
         }
-        std::cout << " " << std::setw(2) << final_places[i] << " место"
-                  << " |" << std::setw(3) << total_results[i].total_points << " б |\n";
+        std::cout << " " << std::setw(2) << final_places[i]
+                  << " место |" << std::setw(3) << total_results[i].total_points << " б |\n";
     }
     std::cout << "\n\n";
 }
 
-void draw_progress(int stage, int positions[]) {
+void drawCars(int stage, int positions[MAX_CARS]) {
     std::cout << "\033c";
-    std::cout << "\n=== ЭТАП " << stage << " ===\n";
+    std::cout << "=== ЭТАП " << stage << " / " << STAGES << " ===\n\n";
+
+    const std::string top    = "    ______";
+    const std::string middle = " __/  __  \\__";
+    const std::string bottom = "'---O----O----'";
+    const int max_pos = TRACK_WIDTH - (int)bottom.size() - 1;
 
     for (int i = 0; i < MAX_CARS; ++i) {
-        int progress = (positions[i] * 100) / DISTANCE;
-        int pos = (progress * 50) / 100;
-        int line = 5 + i * 3;
+        int pos = ((positions[i] * 100) / DISTANCE) * max_pos / 100;
+        std::string pad(pos, ' ');
 
-        std::cout << "\033[" << line     << ";0H\033[K\033[" << pos << "C    ______";
-        std::cout << "\033[" << (line+1) << ";0H\033[K\033[" << pos << "C __/  __  \\__";
-        std::cout << "\033[" << (line+2) << ";0H\033[K\033[" << pos << "C'---O----O----'";
+        std::cout << pad << top    << "\n";
+        std::cout << pad << middle << "\n";
+        std::cout << pad << bottom << "\n";
     }
-
     fflush(stdout);
 }
 
@@ -109,38 +96,18 @@ void init_total_results(CarTotalResult total_results[]) {
     }
 }
 
-void update_stage_results(CarTotalResult total_results[], int stage_places[], int stage) {
-    int points_table[6] = {0, 25, 18, 15, 12, 10};
-
-    for (int car = 0; car < MAX_CARS; ++car) {
-        int place = stage_places[car];
-        if (place == 0) place = MAX_CARS;
-
-        int points = points_table[place];
-
-        total_results[car].stage_results[stage-1].place = place;
-        total_results[car].stage_results[stage-1].points = points;
-        total_results[car].total_points += points;
-    }
+// Пошаговое движение для отправки прогресса через MPI_Gather
+void drive_tick(int& distance_covered, int seed_base, int car_id, int tick) {
+    if (distance_covered >= DISTANCE) return;
+    srand(seed_base + car_id * 1000 + tick * 37);
+    int speed = 100 + (rand() % 81);
+    distance_covered += speed;
+    if (distance_covered > DISTANCE) distance_covered = DISTANCE;
+    usleep(1000000 / speed);
 }
 
-void wait_for_enter(int stage) {
-    if (stage < STAGES) {
-        std::cout << "\033[" << (22 + 7 + MAX_CARS) << ";0H";
-        std::cout << "Нажмите Enter, чтобы продолжить...";
-        std::string dummy;
-        std::getline(std::cin, dummy);
-    }
-}
+int main(int argc, char** argv) {
 
-void send_message(int car_id, int distance, int type) {
-    Message msg;
-    msg.car_id = car_id;
-    msg.current_distance = distance;
-    MPI_Send(&msg, sizeof(Message), MPI_BYTE, 0, type, MPI_COMM_WORLD);
-}
-
-int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
     int rank, size;
@@ -148,98 +115,94 @@ int main(int argc, char *argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
     if (size != MAX_CARS + 1) {
-        if (rank == 0) {
-            std::cerr << "Неверное количество процессов. Ожидается " << MAX_CARS + 1 << " процессов." << std::endl;
-        }
+        if (rank == 0)
+            std::cerr << "Запустите с " << (MAX_CARS + 1)
+                      << " процессами:\n  mpirun -np "
+                      << (MAX_CARS + 1) << " ./race\n";
         MPI_Finalize();
         return 1;
     }
 
+    CarTotalResult total_results[MAX_CARS];
     if (rank == 0) {
-        CarTotalResult total_results[MAX_CARS];
         init_total_results(total_results);
+    }
 
-        for (int stage = 1; stage <= STAGES; ++stage) {
-            int start_signal;
-            MPI_Bcast(&start_signal, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    for (int stage = 1; stage <= STAGES; ++stage) {
+        // синхронизация старта этапа
+        MPI_Barrier(MPI_COMM_WORLD);
 
-            std::cout << "\033c";
-            std::cout << "\n=== ЭТАП " << stage << " ===\n";
+        // MPI_Bcast — арбитр рассылает seed этапа
+        int stage_seed = 0;
+        if (rank == 0)
+            stage_seed = (int)time(nullptr) + stage * 1000;
+        MPI_Bcast(&stage_seed, 1, MPI_INT, 0, MPI_COMM_WORLD); // <<< MPI_Bcast: сигнал старта + seed
 
-            int positions[MAX_CARS] = {0};
-            bool stage_finished = false;
-            int finished_count = 0;
-            int stage_places[MAX_CARS] = {0};
-            int next_place = 1;
-            bool finished[MAX_CARS] = {false};
+        int my_distance = 0;
+        int my_done     = 0;
 
-            while (!stage_finished) {
-                MPI_Status status;
-                Message msg;
-                int flag;
+        int all_distances[MAX_CARS + 1] = {0};
+        int all_done_buf[MAX_CARS + 1]  = {0};
+        int positions[MAX_CARS]         = {0};
+        int finished[MAX_CARS]          = {0};
+        int finish_order[MAX_CARS]      = {0};
+        int next_place     = 1;
+        int finished_count = 0;
 
-                MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
-                if (flag) {
-                    MPI_Recv(&msg, sizeof(Message), MPI_BYTE, status.MPI_SOURCE,
-                            status.MPI_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        int tick = 0;
+        while (true) {
 
-                    switch (status.MPI_TAG) {
-                        case 0: // о прогрессе
-                            if (!finished[msg.car_id]) {
-                                positions[msg.car_id] = msg.current_distance;
-                            }
-                            break;
+            if (rank > 0 && my_done == 0) {
+                drive_tick(my_distance, stage_seed, rank - 1, tick);
+                if (my_distance >= DISTANCE)
+                    my_done = 1;
+            }
 
-                        case 1: // о завершении этапа
-                            if (stage_places[msg.car_id] == 0) {
-                                stage_places[msg.car_id] = next_place++;
-                                finished_count++;
-                            }
-                            finished[msg.car_id] = true;
-                            break;
+            MPI_Gather(&my_distance, 1, MPI_INT, all_distances, 1, MPI_INT, 0, MPI_COMM_WORLD);
+            MPI_Gather(&my_done, 1, MPI_INT, all_done_buf, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+            int stop = 0;
+            if (rank == 0) {
+                for (int i = 0; i < MAX_CARS; ++i) {
+                    positions[i] = all_distances[i + 1];
+                    if (positions[i] >= DISTANCE && finished[i] == 0) {
+                        finished[i] = next_place;
+                        finish_order[next_place - 1] = i;
+                        next_place++;
+                        finished_count++;
                     }
                 }
-                draw_progress(stage, positions);
+                drawCars(stage, positions);
 
-                if (finished_count == MAX_CARS) { stage_finished = true; }
-                usleep(20000);
+                if (finished_count == MAX_CARS) stop = 1;
             }
+            MPI_Bcast(&stop, 1, MPI_INT, 0, MPI_COMM_WORLD); //сигнал конца этапа
+            if (stop) break;
 
-            StageResult all_results[MAX_CARS];
-            MPI_Gather(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, all_results,
-                    sizeof(StageResult), MPI_BYTE, 0, MPI_COMM_WORLD);
+            tick++;
+        }
 
-            update_stage_results(total_results, stage_places, stage);
+        if (rank == 0) {
+            int points_table[6] = {0, 25, 18, 15, 12, 10};
+            for (int place = 1; place <= MAX_CARS; ++place) {
+                int car = finish_order[place - 1];
+                total_results[car].stage_results[stage - 1].place  = place;
+                total_results[car].stage_results[stage - 1].points = points_table[place];
+                total_results[car].total_points += points_table[place];
+            }
             printResults(stage, total_results);
-            wait_for_enter(stage);
-        }
-    }
-    else {
-        int car_id = rank - 1;
-        srand(time(nullptr) + car_id);
 
-        for (int stage = 1; stage <= STAGES; ++stage) {
-            int distance_covered = 0;
-            int speed;
-
-            while (distance_covered < DISTANCE) {
-                speed = 200 + (rand() % 81);
-                distance_covered += speed;
-                if (distance_covered > DISTANCE) distance_covered = DISTANCE;
-
-                send_message(car_id, distance_covered, 0);  // 0 - прогресс
-                usleep(1000000 / speed);
+            if (stage < STAGES) {
+                std::cout << "Нажмите Enter для следующего этапа...";
+                std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+                std::cin.get();
             }
-            send_message(car_id, distance_covered, 1);  // 1 - финиш
-
-            StageResult local_result;
-            local_result.car_id = car_id;
-            local_result.place = 0;
-
-            MPI_Gather(&local_result, sizeof(StageResult), MPI_BYTE, nullptr,
-                       sizeof(StageResult), MPI_BYTE, 0, MPI_COMM_WORLD);
         }
+        MPI_Barrier(MPI_COMM_WORLD); // конец этапа
     }
+
+    if (rank == 0)
+        std::cout << "=== ГОНКА ЗАВЕРШЕНА ===\n";
 
     MPI_Finalize();
     return 0;
